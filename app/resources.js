@@ -3,14 +3,12 @@
 // ===============================
 const actions = document.getElementById("resourceActions");
 const resourceNameContainer = document.getElementById("resourceNameContainer");
-const resourceDescriptionInput = document.getElementById("resourceDescription");
 
 // Example roles
 const role = "admin"; // "reserver" | "admin"
 
+// Will hold a reference to the Create button so we can enable/disable it
 let createButton = null;
-let updateButton = null;
-let deleteButton = null;
 
 // ===============================
 // 2) Button creation helpers
@@ -22,6 +20,9 @@ const BUTTON_BASE_CLASSES =
 const BUTTON_ENABLED_CLASSES =
   "bg-brand-primary text-white hover:bg-brand-dark/80 shadow-soft";
 
+const BUTTON_DISABLED_CLASSES =
+  "cursor-not-allowed opacity-50";
+
 function addButton({ label, type = "button", value, classes = "" }) {
   const btn = document.createElement("button");
   btn.type = type;
@@ -30,6 +31,7 @@ function addButton({ label, type = "button", value, classes = "" }) {
   if (value) btn.value = value;
 
   btn.className = `${BUTTON_BASE_CLASSES} ${classes}`.trim();
+
   actions.appendChild(btn);
   return btn;
 }
@@ -38,13 +40,20 @@ function setButtonEnabled(btn, enabled) {
   if (!btn) return;
 
   btn.disabled = !enabled;
+
+  // Keep disabled look in ONE place (here)
   btn.classList.toggle("cursor-not-allowed", !enabled);
   btn.classList.toggle("opacity-50", !enabled);
 
+  // Optional: remove hover feel when disabled (recommended UX)
   if (!enabled) {
     btn.classList.remove("hover:bg-brand-dark/80");
   } else {
-    btn.classList.add("hover:bg-brand-dark/80");
+    // Only re-add if this button is supposed to have it
+    // (for Create we know it is)
+    if (btn.value === "create" || btn.textContent === "Create") {
+      btn.classList.add("hover:bg-brand-dark/80");
+    }
   }
 }
 
@@ -53,7 +62,6 @@ function renderActionButtons(currentRole) {
     createButton = addButton({
       label: "Create",
       type: "submit",
-      value: "create",
       classes: BUTTON_ENABLED_CLASSES,
     });
   }
@@ -79,24 +87,25 @@ function renderActionButtons(currentRole) {
     });
   }
 
-  // Disable all by default
+  // Default: Buttons are disabled until validation says it's OK
   setButtonEnabled(createButton, false);
   setButtonEnabled(updateButton, false);
   setButtonEnabled(deleteButton, false);
 }
 
 // ===============================
-// 3) Input creation
+// 3) Input creation + validation
 // ===============================
-
 function createResourceNameInput(container) {
   const input = document.createElement("input");
 
+  // Core attributes
   input.id = "resourceName";
   input.name = "resourceName";
   input.type = "text";
   input.placeholder = "e.g., Meeting Room A";
 
+  // Base Tailwind styling (single source of truth)
   input.className = `
     mt-2 w-full rounded-2xl border border-black/10 bg-white
     px-4 py-3 text-sm outline-none
@@ -108,12 +117,10 @@ function createResourceNameInput(container) {
   return input;
 }
 
-// ===============================
-// 4) Validation logic
-// ===============================
-
 function isResourceNameValid(value) {
   const trimmed = value.trim();
+
+  // Allowed: letters, numbers, Finnish letters, and space (based on your current regex)
   const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ ]+$/;
 
   const lengthValid = trimmed.length >= 5 && trimmed.length <= 30;
@@ -124,9 +131,10 @@ function isResourceNameValid(value) {
 
 function isResourceDescriptionValid(value) {
   const trimmed = value.trim();
-  const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ ,.]+$/;
 
-  // 🔥 EXACT REQUIREMENT: 10–50 characters
+  // Allowed: letters, numbers, Finnish letters, and space
+  const allowedPattern = /^[a-zA-Z0-9äöåÄÖÅ ]+$/;
+
   const lengthValid = trimmed.length >= 10 && trimmed.length <= 50;
   const charactersValid = allowedPattern.test(trimmed);
 
@@ -134,62 +142,85 @@ function isResourceDescriptionValid(value) {
 }
 
 function setInputVisualState(input, state) {
-  input.classList.remove("border-green-500", "border-red-500");
+  // Reset to neutral base state (remove only our own validation-related classes)
+  input.classList.remove(
+    "border-green-500",
+    "bg-green-100",
+    "focus:ring-green-500/30",
+    "border-red-500",
+    "bg-red-100",
+    "focus:ring-red-500/30",
+    "focus:border-brand-blue",
+    "focus:ring-brand-blue/30"
+  );
+
+  // Ensure base focus style is present when neutral
+  // (If we are valid/invalid, we override ring color but keep ring behavior)
+  input.classList.add("focus:ring-2");
 
   if (state === "valid") {
-    input.classList.add("border-green-500");
+    input.classList.add("border-green-500", "bg-green-100", "focus:ring-green-500/30");
   } else if (state === "invalid") {
-    input.classList.add("border-red-500");
+    input.classList.add("border-red-500", "bg-red-100", "focus:ring-red-500/30");
+  } else {
+    // neutral: keep base border/bg; nothing else needed
   }
 }
 
-// ===============================
-// 5) Combined validation
-// ===============================
-
-function attachValidation(nameInput) {
+function attachResourceNameValidation(input) {
   const update = () => {
-    const nameValue = nameInput.value;
-    const descriptionValue = resourceDescriptionInput.value;
-
-    const nameValid = isResourceNameValid(nameValue);
-    const descriptionValid = isResourceDescriptionValid(descriptionValue);
-
-    // Name visual
-    if (nameValue.trim() === "") {
-      setInputVisualState(nameInput, null);
-    } else {
-      setInputVisualState(nameInput, nameValid ? "valid" : "invalid");
+    const raw = input.value;
+    if (raw.trim() === "") {
+      setInputVisualState(input, "neutral");
+      setButtonEnabled(createButton, false);
+      return;
     }
 
-    // Description visual
-    if (descriptionValue.trim() === "") {
-      setInputVisualState(resourceDescriptionInput, null);
-    } else {
-      setInputVisualState(
-        resourceDescriptionInput,
-        descriptionValid ? "valid" : "invalid"
-      );
-    }
+    const valid = isResourceNameValid(raw);
+    setInputVisualState(input, valid ? "valid" : "invalid");
 
-    const formValid = nameValid && descriptionValid;
+    // Combined check: also require description to be valid
+    const descInput = document.getElementById("resourceDescription");
+    const descValid = descInput ? isResourceDescriptionValid(descInput.value.trim()) : false;
 
-    setButtonEnabled(createButton, formValid);
-    setButtonEnabled(updateButton, formValid);
-    setButtonEnabled(deleteButton, formValid);
+    setButtonEnabled(createButton, valid && descValid);
   };
 
-  nameInput.addEventListener("input", update);
-  resourceDescriptionInput.addEventListener("input", update);
+  // Real-time validation
+  input.addEventListener("input", update);
 
+  // Initialize state on page load
+  update();
+}
+
+function attachResourceDescriptionValidation(input) {
+  const update = () => {
+    const raw = input.value;
+    if (raw.trim() === "") {
+      setInputVisualState(input, "neutral");
+      setButtonEnabled(createButton, false);
+      return;
+    }
+
+    const valid = isResourceDescriptionValid(raw);
+    setInputVisualState(input, valid ? "valid" : "invalid");
+
+    // Combined check: also require name to be valid
+    const nameInput = document.getElementById("resourceName");
+    const nameValid = nameInput ? isResourceNameValid(nameInput.value.trim()) : false;
+
+    setButtonEnabled(createButton, valid && nameValid);
+  };
+  input.addEventListener("input", update);
   update();
 }
 
 // ===============================
-// 6) Bootstrapping
+// 4) Bootstrapping
 // ===============================
-
 renderActionButtons(role);
 
 const resourceNameInput = createResourceNameInput(resourceNameContainer);
-attachValidation(resourceNameInput);
+attachResourceNameValidation(resourceNameInput);
+const resourceDescriptionInput = document.getElementById("resourceDescription");
+attachResourceDescriptionValidation(resourceDescriptionInput);
