@@ -1,10 +1,10 @@
 -- Initialize resources table for Phase4 Booking System
 CREATE TABLE IF NOT EXISTS resources (
   id SERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  description VARCHAR(200),
-  available BOOLEAN DEFAULT false,
-  price DECIMAL(10,2) NOT NULL,
-  price_unit VARCHAR(20),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  name TEXT NOT NULL,
+  description TEXT,
+  available BOOLEAN NOT NULL DEFAULT false,
+  price NUMERIC(12,2) NOT NULL DEFAULT 0,
+  price_unit TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
