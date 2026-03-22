@@ -190,4 +190,25 @@ sequenceDiagram
 
 ---
 
+## Runtime verification (Docker + HTTP)
+
+Phase6 was run with `docker compose up -d --build` from the Phase6 project folder (`.env` maps **`EPORT=5000`** → app). The following were checked against **`http://localhost:5000`** (same requests the browser **Network** tab shows; you can repeat in DevTools or with curl/Invoke-WebRequest):
+
+| Check | Request | Result |
+|--------|---------|--------|
+| Read list | `GET /api/resources` | `200`, `{ "ok": true, "data": [...] }` |
+| Create | `POST /api/resources` (valid JSON body) | `201`, `{ "ok": true, "data": { ... } }` |
+| Create validation | `POST` with invalid body | `400`, `{ "ok": false, "errors": [...] }` |
+| Create duplicate | `POST` same `resourceName` (case-insensitive unique index) | `409`, `{ "ok": false, "error": "Duplicate resource name" }` |
+| Read one | `GET /api/resources/:id` | `200` + row when present |
+| Read one | `GET /api/resources/notanumber` | `400` `"Invalid ID"` |
+| Read one | `GET /api/resources/99999` (missing row) | `404` `"Resource not found"` |
+| Update | `PUT /api/resources/:id` (valid body) | `200`, `{ "ok": true, "data": { ... } }` |
+| Update duplicate | `PUT` with name that clashes with another row | `409` |
+| Update missing | `PUT /api/resources/99999` | `404` |
+| Delete | `DELETE /api/resources/:id` | `204` **empty body** |
+| Delete missing | `DELETE` same id again | `404` |
+
+---
+
 *Phase6 source: `BookingSystemPhase6` (AdvWebDev2026K Materials). Diagrams reflect `src/routes/resources.routes.js`, `public/form.js`, and `public/resources.js`.*
