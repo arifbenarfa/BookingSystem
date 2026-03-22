@@ -1,26 +1,28 @@
-# G1 — CRUD Data Flow (Phase6 Booking System)
+# G1 — CRUD data flow (Phase6 Booking System)
 
-This document models how **Phase6** handles **Create**, **Read**, **Update**, and **Delete** for the `resources` API. Flows are aligned with the codebase:
+Phase6 stores resources in Postgres and exposes them under `/api/resources`. Below is how **Create, Read, Update, Delete** work in the code I used from the course ZIP (`BookingSystemPhase6`).
 
-- **Frontend:** `public/form.js` (submit → `fetch`), `public/resources.js` (list load, edit mode, `window.onResourceActionSuccess` refresh).
-- **Backend:** `src/app.js` mounts `src/routes/resources.routes.js` at **`/api/resources`**.
-- **Validation:** `src/validators/resource.validators.js` (`express-validator`) on **POST** and **PUT**.
-- **Persistence:** `src/db/pool.js` → PostgreSQL (`resources` table in `db/init/001_create_resources.sql`).
-- **Audit logging (C / U / D only):** `src/services/log.service.js` → `booking_log` (logging failures are non-fatal).
+Main files:
 
-**Observed HTTP surface**
+- `public/form.js` — form submit, `fetch` for POST/PUT/DELETE
+- `public/resources.js` — loads the list with `GET /api/resources`, edit mode, `onResourceActionSuccess` refresh
+- `src/routes/resources.routes.js` — Express routes
+- `src/validators/resource.validators.js` — validation on POST and PUT
+- `src/services/log.service.js` — writes to `booking_log` after create/update/delete (not on plain GET)
 
-| Operation | Method | Path | Typical success |
-|-----------|--------|------|-----------------|
-| Create | `POST` | `/api/resources` | `201 Created` + JSON body |
-| Read (list) | `GET` | `/api/resources` | `200 OK` + `{ ok, data: [...] }` |
-| Read (one) | `GET` | `/api/resources/:id` | `200 OK` + `{ ok, data: {...} }` *(implemented in API; list UI uses cache after list load)* |
-| Update | `PUT` | `/api/resources/:id` | `200 OK` + JSON body |
-| Delete | `DELETE` | `/api/resources/:id` | `204 No Content` *(empty body)* |
+**Endpoints (what I saw in Network + quick HTTP tests)**
+
+| Operation | Method | Path | Success |
+|-----------|--------|------|---------|
+| Create | POST | `/api/resources` | 201 + JSON |
+| Read list | GET | `/api/resources` | 200 + `{ ok, data: [...] }` |
+| Read one | GET | `/api/resources/:id` | 200 + one row (API has this; the list page uses cache when you click a row) |
+| Update | PUT | `/api/resources/:id` | 200 + JSON |
+| Delete | DELETE | `/api/resources/:id` | 204, no body |
 
 ---
 
-## CREATE — `POST /api/resources`
+## CREATE — POST /api/resources
 
 ```mermaid
 sequenceDiagram
@@ -64,9 +66,9 @@ sequenceDiagram
 
 ---
 
-## READ — `GET /api/resources` (and optional `GET /api/resources/:id`)
+## READ — GET /api/resources (and GET /api/resources/:id)
 
-The **resources page** loads the list on startup via `loadResources()` in `resources.js` (`fetch("/api/resources")`). Selecting a row fills the form from **`resourcesCache`** (no second request). The backend also implements **`GET /api/resources/:id`** (invalid id → `400`, missing row → `404`, found → `200`) for clients that fetch a single resource by id.
+Opening `/resources` runs `loadResources()` in `resources.js` → `fetch("/api/resources")`. Clicking a list item does **not** call `GET /:id`; it reads from `resourcesCache`. The route `GET /api/resources/:id` still exists on the server (good for testing invalid id / missing row).
 
 ```mermaid
 sequenceDiagram
@@ -95,11 +97,11 @@ sequenceDiagram
     Note over R,E: After CUD, onResourceActionSuccess then loadResources repeats GET list
 ```
 
-**Read-one API** (`GET /api/resources/:id`, not used by the list UI): `GET …/not-a-number` → `400` `"Invalid ID"`; `GET …/999999` where row missing → `404` `"Resource not found"`; `GET …/1` → `200` `{ ok: true, data: row }`.
+Extra checks on **read one** (curl/Postman): bad id → 400 `Invalid ID`; id that does not exist → 404; valid id → 200 with the row.
 
 ---
 
-## UPDATE — `PUT /api/resources/:id`
+## UPDATE — PUT /api/resources/:id
 
 ```mermaid
 sequenceDiagram
@@ -144,7 +146,7 @@ sequenceDiagram
 
 ---
 
-## DELETE — `DELETE /api/resources/:id`
+## DELETE — DELETE /api/resources/:id
 
 ```mermaid
 sequenceDiagram
@@ -163,7 +165,7 @@ sequenceDiagram
     E->>E: Number(id) — if NaN
     alt Invalid id
         E-->>F: 400 { ok: false, error: "Invalid ID" }
-        F->>U: showFormMessage — generic / validation path for 400
+        F->>U: showFormMessage (error)
     else Valid id
         E->>DB: DELETE FROM resources WHERE id = $1
         alt No row deleted
@@ -183,33 +185,31 @@ sequenceDiagram
 
 ---
 
-## Console & Network notes (DevTools)
+## DevTools
 
-- **Network:** Match **Method** and **URL** to the table above; **Create/Update** send `Content-Type: application/json` with `resourceName`, `resourceDescription`, `resourceAvailable`, `resourcePrice`, `resourcePriceUnit`.
-- **Delete:** `204` responses have **no JSON body** — `form.js` treats `204` before `readResponseBody()`.
-- **Console:** On failed list load, `resources.js` logs `Failed to load resources:` with status; `form.js` logs `Fetch error:` on network failure.
+- **Network:** method + URL as in the table; POST/PUT send JSON with `resourceName`, `resourceDescription`, `resourceAvailable`, `resourcePrice`, `resourcePriceUnit`.
+- **Delete:** 204 has no body — `form.js` skips JSON parse for 204.
+- **Console:** failed list load logs in `resources.js`; network errors log in `form.js`.
 
 ---
 
-## Runtime verification (Docker + HTTP)
+## Tests (Docker + localhost)
 
-Phase6 was run with `docker compose up -d --build` from the Phase6 project folder (`.env` maps **`EPORT=5000`** → app). The following were checked against **`http://localhost:5000`** (same requests the browser **Network** tab shows; you can repeat in DevTools or with curl/Invoke-WebRequest):
+I ran Phase6 with Docker (`docker compose up`) and hit `http://localhost:5000` (port from `.env`). Same URLs as in the browser Network tab.
 
 | Check | Request | Result |
 |--------|---------|--------|
-| Read list | `GET /api/resources` | `200`, `{ "ok": true, "data": [...] }` |
-| Create | `POST /api/resources` (valid JSON body) | `201`, `{ "ok": true, "data": { ... } }` |
-| Create validation | `POST` with invalid body | `400`, `{ "ok": false, "errors": [...] }` |
-| Create duplicate | `POST` same `resourceName` (case-insensitive unique index) | `409`, `{ "ok": false, "error": "Duplicate resource name" }` |
-| Read one | `GET /api/resources/:id` | `200` + row when present |
-| Read one | `GET /api/resources/notanumber` | `400` `"Invalid ID"` |
-| Read one | `GET /api/resources/99999` (missing row) | `404` `"Resource not found"` |
-| Update | `PUT /api/resources/:id` (valid body) | `200`, `{ "ok": true, "data": { ... } }` |
-| Update duplicate | `PUT` with name that clashes with another row | `409` |
-| Update missing | `PUT /api/resources/99999` | `404` |
-| Delete | `DELETE /api/resources/:id` | `204` **empty body** |
-| Delete missing | `DELETE` same id again | `404` |
+| Read list | GET /api/resources | 200 + data array |
+| Create | POST /api/resources | 201 |
+| Create bad body | POST | 400 |
+| Duplicate name | POST | 409 |
+| Read one | GET /api/resources/:id | 200 if exists |
+| Read one bad id | GET /api/resources/notanumber | 400 |
+| Read one missing | GET /api/resources/99999 | 404 |
+| Update | PUT /api/resources/:id | 200 |
+| Update duplicate name | PUT | 409 |
+| Update missing id | PUT /api/resources/99999 | 404 |
+| Delete | DELETE /api/resources/:id | 204 empty |
+| Delete again | DELETE same id | 404 |
 
----
-
-*Phase6 source: `BookingSystemPhase6` (AdvWebDev2026K Materials). Diagrams reflect `src/routes/resources.routes.js`, `public/form.js`, and `public/resources.js`.*
+Course materials: AdvWebDev2026K → Phase6 → `BookingSystemPhase6.zip`.
