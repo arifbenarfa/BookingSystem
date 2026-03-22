@@ -81,17 +81,18 @@ sequenceDiagram
     alt List success
         E->>DB: SELECT * FROM resources ORDER BY created_at DESC
         DB-->>E: rows
-        E-->>R: 200 { ok: true, data: rows }
-        R->>R: resourcesCache = body.data; renderResourceList()
+        E-->>R: 200 JSON ok plus data rows
+        R->>R: resourcesCache = body.data
+        R->>R: renderResourceList()
         R->>U: Clickable resource buttons (data-resource-id)
     else Database / server error
-        E-->>R: 500 { ok: false, error: "Database error" }
-        R->>R: console.error("Failed to load resources:", status, body)
+        E-->>R: 500 Database error JSON
+        R->>R: console.error Failed to load resources (see status)
         R->>U: Empty list UI
     end
 
-    Note over U,R: Selecting a resource uses cached row — no GET /:id from the UI.
-    Note over R,E: After CUD actions, onResourceActionSuccess() → loadResources() repeats GET /api/resources.
+    Note over U,R: Selecting a resource uses cached row (no second GET for one item)
+    Note over R,E: After CUD, onResourceActionSuccess then loadResources repeats GET list
 ```
 
 **Read-one API** (`GET /api/resources/:id`, not used by the list UI): `GET …/not-a-number` → `400` `"Invalid ID"`; `GET …/999999` where row missing → `404` `"Resource not found"`; `GET …/1` → `200` `{ ok: true, data: row }`.
