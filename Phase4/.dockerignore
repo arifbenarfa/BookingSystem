@@ -1,0 +1,8 @@
+node_modules
+phase3
+.git
+.env
+*.zip
+Dockerfile
+docker-compose*.yml
+.dockerignore

@@ -1,0 +1,51 @@
+# BUILDING AND RUNNING: docker compose up -d --build
+# ONLY DATABASE: docker compose up -d --build database
+# LOGGING: docker logs booking-system-phase4-web -f
+# LOGGING: docker logs booking-system-phase4-db -f
+# CONNECTING TO CONTAINER: docker exec -it booking-system-phase4-web /bin/sh
+# CONNECTING TO CONTAINER: docker exec -it booking-system-phase4-db /bin/sh
+# CONNECTING TO DATABASE: docker exec -it booking-system-phase4-db psql -U booking_dbuser -d booking_db
+# STOPPING WEB: docker stop booking-system-phase4-web
+# REMOVING: docker compose down --volumes
+# REMOVING IMAGE (IF NEEDED): docker rmi bs-phase4
+name: booking-system-phase4
+services:
+  web:
+    build: .
+    image: bs-phase4
+    container_name: booking-system-phase4-web
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      PORT: 5000
+      PGHOST: database
+      PGPORT: 5432
+      PGDATABASE: ${PGDATABASE}
+      PGUSER: ${PGUSER}
+      PGPASSWORD: ${PGPASSWORD}
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+  database:
+    image: postgres:16-alpine
+    container_name: booking-system-phase4-db
+    environment:
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+      POSTGRES_DB: ${PGDATABASE}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgroot:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgroot: {}

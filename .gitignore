@@ -2,6 +2,7 @@ node_modules/
 **/node_modules/
 .env
 **/.env
+Phase4/.env
 *.log
 .DS_Store
 Thumbs.db
