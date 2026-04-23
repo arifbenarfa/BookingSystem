@@ -1,4 +1,4 @@
-import { initAuthUI, requireAuthOrBlockPage, logout } from "./auth-ui.js";
+import { initAuthUI, requireAuthOrBlockPage, logout, getTokenPayload } from "./auth-ui.js";
 
 initAuthUI();
 if (!requireAuthOrBlockPage()) {
@@ -25,7 +25,17 @@ const updateBtn = document.getElementById("updateBtn");
 const deleteBtn = document.getElementById("deleteBtn");
 const clearBtn = document.getElementById("clearBtn");
 
+const payload = getTokenPayload();
+const currentUserId = payload?.sub ? String(payload.sub) : "";
+
+function setLoggedUserId() {
+  if (currentUserId) {
+    userIdInput.value = currentUserId;
+  }
+}
+
 let reservationsCache = [];
+let resourcesCache = [];
 let mode = "create";
 
 function getAuthHeaders() {
@@ -66,7 +76,7 @@ function setMode(nextMode) {
 function clearForm() {
   reservationIdInput.value = "";
   resourceIdInput.value = "";
-  userIdInput.value = "";
+  setLoggedUserId();
   startTimeInput.value = "";
   endTimeInput.value = "";
   noteInput.value = "";
@@ -90,7 +100,7 @@ function validateForm() {
   const resourceId = Number(resourceIdInput.value);
   const userId = Number(userIdInput.value);
   if (!resourceId || !userId) {
-    setMessage("error", "Resource ID and User ID are required.");
+    setMessage("error", "Resource and User ID are required.");
     return false;
   }
 
@@ -195,6 +205,34 @@ async function refreshReservations() {
   }
 }
 
+async function loadResources() {
+  try {
+    const response = await fetch("/api/resources", {
+      headers: getAuthHeaders(),
+    });
+    const body = await readBody(response);
+    if (!response.ok) {
+      console.error("Loading resources failed");
+      return;
+    }
+
+    resourcesCache = Array.isArray(body.data) ? body.data : [];
+    renderResourceOptions(resourcesCache);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function renderResourceOptions(resources) {
+  resourceIdInput.innerHTML = '<option value="">Select a resource</option>';
+  resources.forEach(resource => {
+    const option = document.createElement("option");
+    option.value = resource.id;
+    option.textContent = resource.name ? `${resource.name} (ID ${resource.id})` : `Resource ${resource.id}`;
+    resourceIdInput.appendChild(option);
+  });
+}
+
 async function createReservation() {
   const payload = readPayloadFromForm();
   const response = await fetch("/api/reservations", {
@@ -285,4 +323,6 @@ clearBtn.addEventListener("click", () => {
 });
 
 setMode("create");
+setLoggedUserId();
+loadResources();
 refreshReservations();

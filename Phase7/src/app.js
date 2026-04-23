@@ -42,6 +42,10 @@ app.get("/reservations", requirePageAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'views/reservations.html'));
 });
 
+app.get("/profile", requirePageAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, 'views/profile.html'));
+});
+
 app.get("/login", (req, res) => {
   res.sendFile(path.join(publicDir, "login.html"));
 });

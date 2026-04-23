@@ -107,14 +107,16 @@
 
               <div class="grid gap-6 lg:grid-cols-2">
                 <div>
-                  <label for="resourceId" class="block text-sm font-semibold">Resource ID</label>
-                  <input id="resourceId" name="resourceId" type="number" min="1" placeholder="e.g. 2"
-                    class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 transition-all duration-200 ease-out" />
+                  <label for="resourceId" class="block text-sm font-semibold">Resource</label>
+                  <select id="resourceId" name="resourceId"
+                    class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 transition-all duration-200 ease-out">
+                    <option value="">Select a resource</option>
+                  </select>
                 </div>
                 <div>
                   <label for="userId" class="block text-sm font-semibold">User ID</label>
-                  <input id="userId" name="userId" type="number" min="1" placeholder="e.g. 1"
-                    class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 transition-all duration-200 ease-out" />
+                  <input id="userId" name="userId" type="number" min="1" placeholder="e.g. 1" readonly
+                    class="mt-2 w-full rounded-2xl border border-black/10 bg-gray-100 px-4 py-3 text-sm outline-none" />
                 </div>
               </div>
 
